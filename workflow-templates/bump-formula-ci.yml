@@ -1,0 +1,30 @@
+name: Bump Formula CI
+
+on:
+  release:
+    types: [released]
+
+env:
+  TAP_URL: https://github.com/${{ github.repository_owner }}/homebrew-public
+
+jobs:
+  examine-release:
+    name: Examine the release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exract release info
+        id: release-info
+        env:
+          GH_TAG_REF: ${{ github.ref }}
+        shell: python
+        run: |
+          import os, re
+
+          tag_ref = os.environ['GH_TAG_REF']
+          tag_name = re.match(
+            r"^(?:refs\/tags\/(?P<tag>.*))",
+            tag_ref
+          ).group("tag")
+
+          print("::debug::tag of the release: {tag_name}".format(tag_name=tag_name))
+          print("::set-output name=tag::{tag_name}".format(tag_name=tag_name))
