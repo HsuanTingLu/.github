@@ -110,6 +110,8 @@ jobs:
 
           # Set outputs
           print("::set-output name=formula_path::{formula_path}".format(formula_path=formula_path))
+          print("::set-output name=formula_name::{formula_name}".format(formula_name=formula_path.name))
+          print("::set-output name=formula_stem::{formula_stem}".format(formula_stem=formula_path.stem))
           if formula_group.get("archive"):
             print("::set-output name=url_type::archive")
           elif formula_group.get("release"):
