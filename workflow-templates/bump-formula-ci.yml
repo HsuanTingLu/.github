@@ -5,8 +5,7 @@ on:
     types: [released]
 
 env:
-  TAP_REPO_OWNER: ${{ github.repository_owner }}
-  TAP_REPO_NAME: homebrew-public
+  TAP_REPO_PATH: ${{ github.repository_owner }}/homebrew-public
 
 jobs:
   examine-release:
@@ -49,7 +48,7 @@ jobs:
         if: ${{ success() }}
         uses: actions/checkout@v2
         with:
-          repository: ${{ env.TAP_REPO_OWNER }}/${{ env.TAP_REPO_NAME }}
+          repository: ${{ env.TAP_REPO_PATH }}
           path: tap_repo
 
       - name: Search formula by url
