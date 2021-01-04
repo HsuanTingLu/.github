@@ -5,6 +5,7 @@ on:
     types: [released]
 
 env:
+  TAP_REPO_OWNER: ${{ github.repository_owner }}
   TAP_REPO_NAME: homebrew-public
 
 jobs:
@@ -48,5 +49,5 @@ jobs:
         if: ${{ success() }}
         uses: actions/checkout@v2
         with:
-          repository: ${{ github.repository_owner }}/${{ env.TAP_REPO_NAME }}
+          repository: ${{ env.TAP_REPO_OWNER }}/${{ env.TAP_REPO_NAME }}
           path: tap_repo
