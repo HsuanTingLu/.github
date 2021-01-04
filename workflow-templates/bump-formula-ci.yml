@@ -4,9 +4,6 @@ on:
   release:
     types: [released]
 
-env:
-  TAP_URL: https://github.com/${{ github.repository_owner }}/homebrew-public
-
 jobs:
   examine-release:
     name: Examine the release
@@ -16,15 +13,28 @@ jobs:
         id: release-info
         env:
           GH_TAG_REF: ${{ github.ref }}
-        shell: python
+        shell: python3 {0}
         run: |
           import os, re
 
+          # Extract tag name
           tag_ref = os.environ['GH_TAG_REF']
           tag_name = re.match(
             r"^(?:refs\/tags\/(?P<tag>.*))",
             tag_ref
           ).group("tag")
 
-          print("::debug::tag of the release: {tag_name}".format(tag_name=tag_name))
+          print("tag of the release: {tag_name}".format(tag_name=tag_name))
           print("::set-output name=tag::{tag_name}".format(tag_name=tag_name))
+
+          # NOTE: some repositories don't use SemVer scheme
+          # Extracts version, excludes prerelease
+          version_groups = re.match(r"^v?(?P<version>\d[\d\.]*)", tag_name)
+          version = version_groups.groupdict().get("version")
+          print("version: {version}".format(version=version))
+
+          if version:
+            print("::set-output name=version::{semver}".format(semver=semver))
+          else:
+            # FIXME: fix error message
+            print("::error file=PLACEHOLDER,line=1,col=1::Release tag does not look like a version tag.")
