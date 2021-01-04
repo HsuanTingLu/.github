@@ -33,12 +33,12 @@ jobs:
 
           # NOTE: some repositories don't use SemVer scheme
           # Extracts version, excludes prerelease
-          version_groups = re.match(r"^v?(?P<version>\d[\d\.]*)", tag_name)
-          version = version_groups.groupdict().get("version")
-          print("version: {version}".format(version=version))
+          version_match = re.match(r"^v?(?P<version>\d[\d\.]*)", tag_name)
 
-          if version:
-            print("::set-output name=version::{semver}".format(semver=semver))
+          if version_match:
+            version = version_match.group("version")
+            print("version: {version}".format(version=version))
+            print("::set-output name=version::{version}".format(version=version))
           else:
             # FIXME: fix error message
             err_msg = "Release tag does not look like a version tag."
