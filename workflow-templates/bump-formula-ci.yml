@@ -18,7 +18,7 @@ jobs:
           GH_TAG_REF: ${{ github.ref }}
         shell: python3 {0}
         run: |
-          import os, re
+          import os, re, sys
 
           # Extract tag name
           tag_ref = os.environ['GH_TAG_REF']
@@ -40,7 +40,9 @@ jobs:
             print("::set-output name=version::{semver}".format(semver=semver))
           else:
             # FIXME: fix error message
-            print("::error file=PLACEHOLDER,line=1,col=1::Release tag does not look like a version tag.")
+            err_msg = "Release tag does not look like a version tag."
+            print("::error file=PLACEHOLDER,line=1,col=1::{err_msg}".format(err_msg=err_msg))
+            sys.exit(err_msg)
 
       - name: Checkout tap repo
         if: ${{ success() }}
