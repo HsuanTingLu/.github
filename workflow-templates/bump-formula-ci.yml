@@ -4,6 +4,9 @@ on:
   release:
     types: [released]
 
+env:
+  TAP_REPO_NAME: homebrew-public
+
 jobs:
   examine-release:
     name: Examine the release
@@ -38,3 +41,10 @@ jobs:
           else:
             # FIXME: fix error message
             print("::error file=PLACEHOLDER,line=1,col=1::Release tag does not look like a version tag.")
+
+      - name: Checkout tap repo
+        if: ${{ success() }}
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.repository_owner }}/${{ env.TAP_REPO_NAME }}
+          path: tap_repo
