@@ -5,7 +5,8 @@ on:
     types: [released]
 
 env:
-  TAP_REPO_PATH: ${{ github.repository_owner }}/homebrew-public
+  TAP_REPO_OWNER: ${{ github.repository_owner }}
+  TAP_REPO_NAME: homebrew-public
 
 jobs:
   examine-release:
@@ -14,17 +15,14 @@ jobs:
     steps:
       - name: Exract release info
         id: release-info
-        env:
-          GH_TAG_REF: ${{ github.ref }}
         shell: python3 {0}
         run: |
           import os, re, sys
 
           # Extract tag name
-          tag_ref = os.environ['GH_TAG_REF']
           tag_name = re.match(
             r"^(?:refs/tags/(?P<tag>.*))",
-            tag_ref
+            os.environ['GITHUB_REF']
           ).group("tag")
 
           print("tag of the release: {tag_name}".format(tag_name=tag_name))
@@ -46,19 +44,17 @@ jobs:
       - name: Checkout tap repo
         uses: actions/checkout@v2
         with:
-          repository: ${{ env.TAP_REPO_PATH }}
-          path: tap_repo
+          repository: ${{ env.TAP_REPO_OWNER }}/${{ env.TAP_REPO_NAME }}
+          path: ${{ env.TAP_REPO_NAME }}
 
       - name: Search formula by url
         id: search-formula
-        env:
-          LIB_REPO: ${{ github.repository }}
         shell: python3 {0}
         run: |
           import os, re, sys, pathlib, concurrent.futures
 
           url_regex = re.compile(
-            r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['LIB_REPO']) + \
+            r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['GITHUB_REPOSITORY']) + \
             r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
             r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
             r"(?(archive)|(?(release)/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
@@ -76,7 +72,12 @@ jobs:
             else:
               return False
 
-          formula_paths = list(pathlib.Path("tap_repo/Formula").glob("*.rb"))
+          formula_paths = list(pathlib.Path(
+            os.environ['GITHUB_WORKSPACE'],
+            os.environ["TAP_REPO_NAME"],
+            "Formula",
+          ).glob("*.rb"))
+
           with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
             matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
 
