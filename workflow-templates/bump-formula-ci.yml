@@ -47,7 +47,7 @@ jobs:
           brew tap $TAP_REPO_OWNER/$TAP_REPO_NAME
           echo "::set-output name=tap_git_dir::$(brew --repo $TAP_REPO_OWNER/$TAP_REPO_NAME)"
 
-      - name: Search formula by url
+      - name: Search formula by URL
         id: search-formula
         env:
           TAP_GIT_DIR: ${{ steps.checkout-tap-repo.outputs.tap_git_dir }}
@@ -92,9 +92,8 @@ jobs:
 
           # Set outputs
           formula_filepath, formula_match = matched_formulas[0]
-
-          print("::set-output name=formula_path::{formula_filepath}".format(formula_filepath=formula_filepath))
-          print("::set-output name=formula_name::{formula_name}".format(formula_name=formula_filepath.stem))
+          print("::set-output name=formula_path::{filepath}".format(filepath=formula_filepath))
+          print("::set-output name=formula_name::{name}".format(name=formula_filepath.stem))
 
           formula_group = formula_match.groupdict()
           if formula_group.get("archive"):
