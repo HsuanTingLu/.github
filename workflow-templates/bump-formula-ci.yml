@@ -23,7 +23,7 @@ jobs:
           # Extract tag name
           tag_ref = os.environ['GH_TAG_REF']
           tag_name = re.match(
-            r"^(?:refs\/tags\/(?P<tag>.*))",
+            r"^(?:refs/tags/(?P<tag>.*))",
             tag_ref
           ).group("tag")
 
@@ -66,13 +66,13 @@ jobs:
           lib_repo_name = lib_repo_path[len(lib_repo_owner)+1:]
 
           url_regex = re.compile(
-            r"^ *url +(?P<quote_type>[\"\'])https:\/\/github\.com\/(?P<REPO_OWNER>{repo_owner})\/(?P<REPO_NAME>{repo_name})\/".format(
+            r"^ *url +(?P<quote_type>[\"\'])https://github\.com/(?P<REPO_OWNER>{repo_owner})/(?P<REPO_NAME>{repo_name})/".format(
               repo_owner=lib_repo_owner,
               repo_name=lib_repo_name
             ) + \
-            r"(?:(?P<archive>archive)|(?P<release>releases\/download))\/" \
+            r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
             r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
-            r"(?(archive)|(?(release)\/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
+            r"(?(archive)|(?(release)/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
             lib_repo,
             re.MULTILINE
           )
