@@ -59,7 +59,7 @@ jobs:
               r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['GITHUB_REPOSITORY']) + \
               r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
               r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
-              r"(?(archive)|(?(release)/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
+              r"(?(archive)|(?(release)/.*?\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
               lib_repo,
               re.MULTILINE,
           )
