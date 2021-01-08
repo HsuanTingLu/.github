@@ -104,3 +104,59 @@ jobs:
               err_msg = "Formula parser matched some undocumented URL format."
               print("::error::{err_msg}".format(err_msg=err_msg))
               sys.exit(err_msg)
+
+      - name: Update formula
+        id: update-formula
+        env:
+          FORMULA_PATH: ${{ steps.search-formula.outputs.formula_path }}
+          URL_TYPE: ${{ steps.search-formula.outputs.url_type }}
+          NEW_TAG: ${{ steps.release-info.outputs.tag }}
+          NEW_VERSION: ${{ steps.release-info.outputs.version }}
+        shell: python3 {0}
+        run: |
+          import os, re, sys, pathlib, urllib.request, hashlib
+
+          formula_path = pathlib.Path(os.environ['FORMULA_PATH'])
+          with formula_path.open(mode="r") as f:
+              formula = f.read()
+
+          # Update URL
+          url_regex = r"^(?P<keep> *url +(?P<quote_type>[\"\'])https://github\.com/.*?/)" \
+                      r"(?:(?P<archive>archive)|(?P<release>releases/download))/"
+                      r"(?P<tag>v?(?P<version>\d[\d\.]*))(?(archive)|(?(release)/(?P<asset_name>.*?)\-(?P=version)|))"
+                      r"\.(?P<compress>tar\.gz|zip)(?P=quote_type)$"
+
+          if os.environ['URL_TYPE'] == "archive":
+              asset_path = ""
+          elif os.environ['URL_TYPE'] == "release":
+              asset_path = "/\\g<asset_name>-{version}".format(version=os.environ['NEW_VERSION'])
+          else:
+              err_msg = "Formula parser matched some undocumented URL format."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
+
+          url_substitution = "\\g<keep>\\g<{release_type}>/{tag}{asset_path}.\\g<compress>\\g<quote_type>".format(
+              release_type=os.environ['URL_TYPE'],
+              tag=os.environ['NEW_TAG'],
+              asset_path=asset_path,
+          )
+
+          formula_with_new_url = re.sub(url_regex, url_substitution, formula, 1, re.MULTILINE)
+
+          # Update hash
+          new_url_regex = r"^ *url +(?P<quote_type>[\"\'])(?P<url>.*)(?P=quote_type)$"
+          new_url = re.search(new_url_regex, formula_with_new_url, re.MULTILINE).group("url")
+          with urllib.request.urlopen(new_url) as release_asset:
+              new_hash = hashlib.sha256(release_asset.read()).hexdigest()
+
+          hash_regex = r"(?P<keep>^ *sha256 +)(?P<quote_type>[\"\'])(?P<hash>.*)(?P=quote_type)$"
+
+          hash_substitution = "\\g<keep>\\g<quote_type>{hash}\\g<quote_type>".format(
+              hash=new_hash,
+          )
+
+          updated_formula = re.sub(hash_regex, hash_substitution, formula_with_new_url, 1, re.MULTILINE)
+
+          # Save changes
+          with formula_path.open(mode="w") as f:
+              f.write(updated_formula)
