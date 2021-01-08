@@ -7,6 +7,8 @@ on:
 env:
   TAP_REPO_OWNER: ${{ github.repository_owner }}
   TAP_REPO_NAME: homebrew-public
+  GIT_NAME: Hsuan-Ting Lu
+  GIT_EMAIL: hsuan.ting.lu.ee05@g2.nctu.edu.tw
 
 jobs:
   examine-release:
@@ -173,3 +175,49 @@ jobs:
               shlex.split("brew audit --strict --online {formula}".format(formula=os.environ['FORMULA_NAME'])),
               capture_output=False, check=True, text=True,
           )
+
+      - name: Upload changes
+        id: upload-changes
+        env:
+          FORMULA_NAME: ${{ steps.search-formula.outputs.formula_name }}
+          FORMULA_PATH: ${{ steps.search-formula.outputs.formula_path }}
+          NEW_FORMULA_VERSION: ${{ steps.release-info.outputs.version }}
+          TAP_GIT_DIR: ${{ steps.checkout-tap-repo.outputs.tap_git_dir }}
+        shell: python3 {0}
+        run: |
+          import os, sys, pathlib, subprocess, shlex
+
+          tap_dir = pathlib.Path(os.environ['TAP_GIT_DIR'])
+          formula_path = os.environ['FORMULA_PATH']
+
+          # Create branch
+          branch_name = "{formula_name}/bump-{new_formula_version}".format(
+              formula_stem=os.environ['FORMULA_NAME'],
+              new_formula_version=os.environ['NEW_FORMULA_VERSION']
+          )
+          subprocess.run(
+              shlex.split("git checkout -b {branch}".format(branch=branch_name)),
+              cwd=tap_dir, check=True, text=True
+          )
+
+          # Commit and push the change
+          subprocess.run(shlex.split("git config user.name {name}".format(
+              name=os.environ['GIT_NAME']
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git config user.email {email}".format(
+              email=os.environ['GIT_EMAIL']
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git add {formula}".format(
+              formula=formula_path
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git commit -m \"{name} {version}\"".format(
+              name=os.environ['FORMULA_NAME'],
+              version=os.environ['NEW_FORMULA_VERSION']
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git push origin {branch}".format(
+              branch=branch_name
+          )), cwd=tap_dir, check=True, text=True)
