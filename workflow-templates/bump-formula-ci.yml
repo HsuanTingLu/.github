@@ -42,13 +42,15 @@ jobs:
               sys.exit(err_msg)
 
       - name: Checkout tap repo
-        uses: actions/checkout@v2
-        with:
-          repository: ${{ env.TAP_REPO_OWNER }}/${{ env.TAP_REPO_NAME }}
-          path: ${{ env.TAP_REPO_NAME }}
+        id: checkout-tap-repo
+        run: |
+          brew tap $TAP_REPO_OWNER/$TAP_REPO_NAME
+          echo "::set-output name=tap_git_dir::$(brew --repo $TAP_REPO_OWNER/$TAP_REPO_NAME)"
 
       - name: Search formula by url
         id: search-formula
+        env:
+          TAP_GIT_DIR: ${{ steps.checkout-tap-repo.outputs.tap_git_dir }}
         shell: python3 {0}
         run: |
           import os, re, sys, pathlib, concurrent.futures
@@ -72,12 +74,7 @@ jobs:
               else:
                   return False
 
-          formula_paths = list(pathlib.Path(
-              os.environ['GITHUB_WORKSPACE'],
-              os.environ["TAP_REPO_NAME"],
-              "Formula",
-          ).glob("*.rb"))
-
+          formula_paths = list(pathlib.Path(os.environ['TAP_GIT_DIR'], "Formula").glob("*.rb"))
           with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
               matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
 
