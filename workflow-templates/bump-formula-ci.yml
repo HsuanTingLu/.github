@@ -160,3 +160,16 @@ jobs:
           # Save changes
           with formula_path.open(mode="w") as f:
               f.write(updated_formula)
+
+      - name: Audit changes
+        id: audit-changes
+        env:
+          FORMULA_NAME: ${{ steps.search-formula.outputs.formula_name }}
+        shell: python3 {0}
+        run: |
+          import os, subprocess, shlex
+
+          subprocess.run(
+              shlex.split("brew audit --strict --online {formula}".format(formula=os.environ['FORMULA_NAME'])),
+              capture_output=False, check=True, text=True,
+          )
