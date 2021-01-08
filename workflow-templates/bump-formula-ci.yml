@@ -21,8 +21,8 @@ jobs:
 
           # Extract tag name
           tag_name = re.match(
-            r"^(?:refs/tags/(?P<tag>.*))",
-            os.environ['GITHUB_REF']
+              r"^(?:refs/tags/(?P<tag>.*))",
+              os.environ['GITHUB_REF']
           ).group("tag")
 
           print("tag of the release: {tag_name}".format(tag_name=tag_name))
@@ -33,13 +33,13 @@ jobs:
           version_match = re.match(r"^v?(?P<version>\d[\d\.]*)", tag_name)
 
           if version_match:
-            version = version_match.group("version")
-            print("version: {version}".format(version=version))
-            print("::set-output name=version::{version}".format(version=version))
+              version = version_match.group("version")
+              print("version: {version}".format(version=version))
+              print("::set-output name=version::{version}".format(version=version))
           else:
-            err_msg = "Release tag does not look like a version tag."
-            print("::error::{err_msg}".format(err_msg=err_msg))
-            sys.exit(err_msg)
+              err_msg = "Release tag does not look like a version tag."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
 
       - name: Checkout tap repo
         uses: actions/checkout@v2
@@ -54,44 +54,44 @@ jobs:
           import os, re, sys, pathlib, concurrent.futures
 
           url_regex = re.compile(
-            r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['GITHUB_REPOSITORY']) + \
-            r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
-            r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
-            r"(?(archive)|(?(release)/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
-            lib_repo,
-            re.MULTILINE
+              r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['GITHUB_REPOSITORY']) + \
+              r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
+              r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
+              r"(?(archive)|(?(release)/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
+              lib_repo,
+              re.MULTILINE,
           )
 
           def inspect_formula(path):
-            with path.open(mode='r') as f:
-              formula_match = url_regex.search(f.read())
-
-            if formula_match:
-              print("found formula at: {path}".format(path=path))
-              return (path, formula_match)
-            else:
-              return False
+              """Search for fomulas with matching asset URL"""
+              with path.open(mode='r') as f:
+                  formula_match = url_regex.search(f.read())
+              if formula_match:
+                  print("found formula at: {path}".format(path=path))
+                  return (path, formula_match)
+              else:
+                  return False
 
           formula_paths = list(pathlib.Path(
-            os.environ['GITHUB_WORKSPACE'],
-            os.environ["TAP_REPO_NAME"],
-            "Formula",
+              os.environ['GITHUB_WORKSPACE'],
+              os.environ["TAP_REPO_NAME"],
+              "Formula",
           ).glob("*.rb"))
 
           with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
-            matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
+              matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
 
           if len(matched_formulas) == 0:
-            err_msg = "Formula with matching asset URL is not found."
-            print("::error::{err_msg}".format(err_msg=err_msg))
-            sys.exit(err_msg)
+              err_msg = "Formula with matching asset URL is not found."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
 
           elif len(matched_formulas) > 1:
-            print("::group::Found multiple formulas having qualifying URL")
-            for f in matched_formulas:
-              print(f.name)
-            print("::endgroup::")
-            print("::warning::Will only use the first one.")
+              print("::group::Found multiple formulas having qualifying URL")
+              for f in matched_formulas:
+                  print(f.name)
+              print("::endgroup::")
+              print("::warning::Will only use the first one.")
 
           # Set outputs
           formula_filepath, formula_match = matched_formulas[0]
@@ -101,10 +101,10 @@ jobs:
 
           formula_group = formula_match.groupdict()
           if formula_group.get("archive"):
-            print("::set-output name=url_type::archive")
+              print("::set-output name=url_type::archive")
           elif formula_group.get("release"):
-            print("::set-output name=url_type::release")
+              print("::set-output name=url_type::release")
           else:
-            err_msg = "Formula parser matched some undocumented URL format."
-            print("::error::{err_msg}".format(err_msg=err_msg))
-            sys.exit(err_msg)
+              err_msg = "Formula parser matched some undocumented URL format."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
