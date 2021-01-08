@@ -44,7 +44,6 @@ jobs:
             sys.exit(err_msg)
 
       - name: Checkout tap repo
-        if: ${{ success() }}
         uses: actions/checkout@v2
         with:
           repository: ${{ env.TAP_REPO_PATH }}
@@ -52,7 +51,6 @@ jobs:
 
       - name: Search formula by url
         id: search-formula
-        if: ${{ success() }}
         env:
           LIB_REPO: ${{ github.repository }}
         shell: python3 {0}
