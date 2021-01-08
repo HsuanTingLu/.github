@@ -195,6 +195,7 @@ jobs:
               formula_stem=os.environ['FORMULA_NAME'],
               new_formula_version=os.environ['NEW_FORMULA_VERSION']
           )
+          print("::set-output name=branch_name::{branch}".format(branch=branch_name))
           subprocess.run(
               shlex.split("git checkout -b {branch}".format(branch=branch_name)),
               cwd=tap_dir, check=True, text=True
@@ -221,3 +222,21 @@ jobs:
           subprocess.run(shlex.split("git push origin {branch}".format(
               branch=branch_name
           )), cwd=tap_dir, check=True, text=True)
+
+      - name: Open pull request
+        id: open-pr
+        env:
+          BRANCH_NAME: ${{ steps.upload-changes.outputs.branch_name }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            github.pulls.create({
+              owner: process.env.TAP_REPO_OWNER,
+              repo: process.env.TAP_REPO_NAME,
+              // title: PR-title,
+              head: process.env.TAP_REPO_OWNER + "/" + process.env.BRANCH_NAME,
+              base: "master",
+              // body: PR-body,
+              maintainer_can_modify: true,
+              draft: false
+            })
