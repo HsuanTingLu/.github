@@ -56,20 +56,12 @@ jobs:
         if: ${{ success() }}
         env:
           LIB_REPO: ${{ github.repository }}
-          LIB_REPO_OWNER: ${{ github.repository_owner }}
         shell: python3 {0}
         run: |
           import os, re, sys, pathlib, concurrent.futures
 
-          lib_repo_path = os.environ['LIB_REPO']
-          lib_repo_owner = os.environ['LIB_REPO_OWNER']
-          lib_repo_name = lib_repo_path[len(lib_repo_owner)+1:]
-
           url_regex = re.compile(
-            r"^ *url +(?P<quote_type>[\"\'])https://github\.com/(?P<REPO_OWNER>{repo_owner})/(?P<REPO_NAME>{repo_name})/".format(
-              repo_owner=lib_repo_owner,
-              repo_name=lib_repo_name
-            ) + \
+            r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['LIB_REPO']) + \
             r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
             r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
             r"(?(archive)|(?(release)/(?P=REPO_NAME)\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
@@ -87,7 +79,7 @@ jobs:
             else:
               return False
 
-          formula_paths = list(pathlib.Path("./tap_repo/Formula").glob("*.rb"))
+          formula_paths = list(pathlib.Path("tap_repo/Formula").glob("*.rb"))
           with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
             matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
 
