@@ -39,9 +39,8 @@ jobs:
             print("version: {version}".format(version=version))
             print("::set-output name=version::{version}".format(version=version))
           else:
-            # FIXME: fix error message
             err_msg = "Release tag does not look like a version tag."
-            print("::error file=PLACEHOLDER,line=1,col=1::{err_msg}".format(err_msg=err_msg))
+            print("::error::{err_msg}".format(err_msg=err_msg))
             sys.exit(err_msg)
 
       - name: Checkout tap repo
@@ -84,17 +83,16 @@ jobs:
             matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
 
           if len(matched_formulas) == 0:
-            # FIXME: fix error message
-            err_msg = "Formula not found."
-            print("::error file=PLACEHOLDER,line=1,col=1::{err_msg}".format(err_msg=err_msg))
+            err_msg = "Formula with matching asset URL is not found."
+            print("::error::{err_msg}".format(err_msg=err_msg))
             sys.exit(err_msg)
 
           elif len(matched_formulas) > 1:
-            # FIXME: fix warning message
-            warn_msg = "Found multiple formulas having qualifying URL: {paths}".format(
-              paths=", ".join([p.name for p in matched_formulas])
-            ) + ", will use the first one."
-            print("::warning file=PLACEHOLDER,line=1,col=1::{warn_msg}".format(warn_msg=warn_msg))
+            print("::group::Found multiple formulas having qualifying URL")
+            for f in matched_formulas:
+              print(f.name)
+            print("::endgroup::")
+            print("::warning::Will only use the first one.")
 
           # Set outputs
           formula_filepath, formula_match = matched_formulas[0]
@@ -108,8 +106,6 @@ jobs:
           elif formula_group.get("release"):
             print("::set-output name=url_type::release")
           else:
-            # FIXME: fix error message
             err_msg = "Formula parser matched some undocumented URL format."
-            print("::error file=PLACEHOLDER,line=1,col=1::{err_msg}".format(err_msg=err_msg))
-            # TODO: set exit code 1 or raise some exception
-            pass
+            print("::error::{err_msg}".format(err_msg=err_msg))
+            sys.exit(err_msg)
