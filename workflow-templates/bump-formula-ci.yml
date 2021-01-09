@@ -13,7 +13,13 @@ env:
 jobs:
   examine-release:
     name: Examine the release
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-11.0, macos-10.15]
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Exract release info
         id: release-info
