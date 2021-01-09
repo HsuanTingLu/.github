@@ -1,0 +1,5 @@
+{
+    "name": "Bump Formula Workflow",
+    "description": "Library auto bump formula workflow template",
+    "iconName": "homebrew_logo"
+}
