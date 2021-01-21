@@ -1,0 +1,248 @@
+name: Bump Formula CI
+
+on:
+  release:
+    types: [released]
+
+env:
+  TAP_REPO_OWNER: ${{ github.repository_owner }}
+  TAP_REPO_NAME: homebrew-public
+  GIT_NAME: Hsuan-Ting Lu
+  GIT_EMAIL: hsuan.ting.lu.ee05@g2.nctu.edu.tw
+
+jobs:
+  examine-release:
+    name: Examine the release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-11.0, macos-10.15]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Exract release info
+        id: release-info
+        shell: python3 {0}
+        run: |
+          import os, re, sys
+
+          # Extract tag name
+          tag_name = re.match(
+              r"^(?:refs/tags/(?P<tag>.*))",
+              os.environ['GITHUB_REF']
+          ).group("tag")
+
+          print("tag of the release: {tag_name}".format(tag_name=tag_name))
+          print("::set-output name=tag::{tag_name}".format(tag_name=tag_name))
+
+          # NOTE: some repositories don't use SemVer scheme
+          # Extracts version, excludes prerelease
+          version_match = re.match(r"^v?(?P<version>\d[\d\.]*)", tag_name)
+
+          if version_match:
+              version = version_match.group("version")
+              print("version: {version}".format(version=version))
+              print("::set-output name=version::{version}".format(version=version))
+          else:
+              err_msg = "Release tag does not look like a version tag."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
+
+      - name: Checkout tap repo
+        id: checkout-tap-repo
+        run: |
+          brew tap $TAP_REPO_OWNER/$TAP_REPO_NAME
+          echo "::set-output name=tap_git_dir::$(brew --repo $TAP_REPO_OWNER/$TAP_REPO_NAME)"
+
+      - name: Search formula by URL
+        id: search-formula
+        env:
+          TAP_GIT_DIR: ${{ steps.checkout-tap-repo.outputs.tap_git_dir }}
+        shell: python3 {0}
+        run: |
+          import os, re, sys, pathlib, concurrent.futures
+
+          url_regex = re.compile(
+              r"^ *url +(?P<quote_type>[\"\'])https://github\.com/{repo_path}/".format(repo_path=os.environ['GITHUB_REPOSITORY']) + \
+              r"(?:(?P<archive>archive)|(?P<release>releases/download))/" \
+              r"(?P<tag>v?(?P<version>\d[\d\.]*))" \
+              r"(?(archive)|(?(release)/.*?\-(?P=version)|))\.(?:tar\.gz|zip)(?P=quote_type)$",
+              lib_repo,
+              re.MULTILINE,
+          )
+
+          def inspect_formula(path):
+              """Search for fomulas with matching asset URL"""
+              with path.open(mode='r') as f:
+                  formula_match = url_regex.search(f.read())
+              if formula_match:
+                  print("found formula at: {path}".format(path=path))
+                  return (path, formula_match)
+              else:
+                  return False
+
+          formula_paths = list(pathlib.Path(os.environ['TAP_GIT_DIR'], "Formula").glob("*.rb"))
+          with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
+              matched_formulas = [path for path in executor.map(inspect_formula, formula_paths, chunksize=1) if path not False]
+
+          if len(matched_formulas) == 0:
+              err_msg = "Formula with matching asset URL is not found."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
+
+          elif len(matched_formulas) > 1:
+              print("::group::Found multiple formulas having qualifying URL")
+              for f in matched_formulas:
+                  print(f.name)
+              print("::endgroup::")
+              print("::warning::Will only use the first one.")
+
+          # Set outputs
+          formula_filepath, formula_match = matched_formulas[0]
+          print("::set-output name=formula_path::{filepath}".format(filepath=formula_filepath))
+          print("::set-output name=formula_name::{name}".format(name=formula_filepath.stem))
+
+          formula_group = formula_match.groupdict()
+          if formula_group.get("archive"):
+              print("::set-output name=url_type::archive")
+          elif formula_group.get("release"):
+              print("::set-output name=url_type::release")
+          else:
+              err_msg = "Formula parser matched some undocumented URL format."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
+
+      - name: Update formula
+        id: update-formula
+        env:
+          FORMULA_PATH: ${{ steps.search-formula.outputs.formula_path }}
+          URL_TYPE: ${{ steps.search-formula.outputs.url_type }}
+          NEW_TAG: ${{ steps.release-info.outputs.tag }}
+          NEW_VERSION: ${{ steps.release-info.outputs.version }}
+        shell: python3 {0}
+        run: |
+          import os, re, sys, pathlib, urllib.request, hashlib
+
+          formula_path = pathlib.Path(os.environ['FORMULA_PATH'])
+          with formula_path.open(mode="r") as f:
+              formula = f.read()
+
+          # Update URL
+          url_regex = r"^(?P<keep> *url +(?P<quote_type>[\"\'])https://github\.com/.*?/)" \
+                      r"(?:(?P<archive>archive)|(?P<release>releases/download))/"
+                      r"(?P<tag>v?(?P<version>\d[\d\.]*))(?(archive)|(?(release)/(?P<asset_name>.*?)\-(?P=version)|))"
+                      r"\.(?P<compress>tar\.gz|zip)(?P=quote_type)$"
+
+          if os.environ['URL_TYPE'] == "archive":
+              asset_path = ""
+          elif os.environ['URL_TYPE'] == "release":
+              asset_path = "/\\g<asset_name>-{version}".format(version=os.environ['NEW_VERSION'])
+          else:
+              err_msg = "Formula parser matched some undocumented URL format."
+              print("::error::{err_msg}".format(err_msg=err_msg))
+              sys.exit(err_msg)
+
+          url_substitution = "\\g<keep>\\g<{release_type}>/{tag}{asset_path}.\\g<compress>\\g<quote_type>".format(
+              release_type=os.environ['URL_TYPE'],
+              tag=os.environ['NEW_TAG'],
+              asset_path=asset_path,
+          )
+
+          formula_with_new_url = re.sub(url_regex, url_substitution, formula, 1, re.MULTILINE)
+
+          # Update hash
+          new_url_regex = r"^ *url +(?P<quote_type>[\"\'])(?P<url>.*)(?P=quote_type)$"
+          new_url = re.search(new_url_regex, formula_with_new_url, re.MULTILINE).group("url")
+          with urllib.request.urlopen(new_url) as release_asset:
+              new_hash = hashlib.sha256(release_asset.read()).hexdigest()
+
+          hash_regex = r"(?P<keep>^ *sha256 +)(?P<quote_type>[\"\'])(?P<hash>.*)(?P=quote_type)$"
+
+          hash_substitution = "\\g<keep>\\g<quote_type>{hash}\\g<quote_type>".format(
+              hash=new_hash,
+          )
+
+          updated_formula = re.sub(hash_regex, hash_substitution, formula_with_new_url, 1, re.MULTILINE)
+
+          # Save changes
+          with formula_path.open(mode="w") as f:
+              f.write(updated_formula)
+
+      - name: Audit changes
+        id: audit-changes
+        env:
+          FORMULA_NAME: ${{ steps.search-formula.outputs.formula_name }}
+        shell: python3 {0}
+        run: |
+          import os, subprocess, shlex
+
+          subprocess.run(
+              shlex.split("brew audit --strict --online {formula}".format(formula=os.environ['FORMULA_NAME'])),
+              capture_output=False, check=True, text=True,
+          )
+
+      - name: Upload changes
+        id: upload-changes
+        env:
+          FORMULA_NAME: ${{ steps.search-formula.outputs.formula_name }}
+          FORMULA_PATH: ${{ steps.search-formula.outputs.formula_path }}
+          NEW_FORMULA_VERSION: ${{ steps.release-info.outputs.version }}
+          TAP_GIT_DIR: ${{ steps.checkout-tap-repo.outputs.tap_git_dir }}
+        shell: python3 {0}
+        run: |
+          import os, sys, pathlib, subprocess, shlex
+
+          tap_dir = pathlib.Path(os.environ['TAP_GIT_DIR'])
+          formula_path = os.environ['FORMULA_PATH']
+
+          # Create branch
+          branch_name = "{formula_name}/bump-{new_formula_version}".format(
+              formula_stem=os.environ['FORMULA_NAME'],
+              new_formula_version=os.environ['NEW_FORMULA_VERSION']
+          )
+          print("::set-output name=branch_name::{branch}".format(branch=branch_name))
+          subprocess.run(
+              shlex.split("git checkout -b {branch}".format(branch=branch_name)),
+              cwd=tap_dir, check=True, text=True
+          )
+
+          # Commit and push the change
+          subprocess.run(shlex.split("git config user.name {name}".format(
+              name=os.environ['GIT_NAME']
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git config user.email {email}".format(
+              email=os.environ['GIT_EMAIL']
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git add {formula}".format(
+              formula=formula_path
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git commit -m \"{name} {version}\"".format(
+              name=os.environ['FORMULA_NAME'],
+              version=os.environ['NEW_FORMULA_VERSION']
+          )), cwd=tap_dir, check=True, text=True)
+
+          subprocess.run(shlex.split("git push origin {branch}".format(
+              branch=branch_name
+          )), cwd=tap_dir, check=True, text=True)
+
+      - name: Open pull request
+        id: open-pr
+        env:
+          BRANCH_NAME: ${{ steps.upload-changes.outputs.branch_name }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            github.pulls.create({
+              owner: process.env.TAP_REPO_OWNER,
+              repo: process.env.TAP_REPO_NAME,
+              // title: PR-title,
+              head: process.env.TAP_REPO_OWNER + "/" + process.env.BRANCH_NAME,
+              base: "master",
+              // body: PR-body,
+              maintainer_can_modify: true,
+              draft: false
+            })
